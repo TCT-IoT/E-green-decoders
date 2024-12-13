@@ -171,6 +171,27 @@ function decodeUplink(input) {
                 decodedData.errorMessage = hexData.substring(dataIndex, dataIndex + messageLengthHex);
                 dataIndex += messageLengthHex;
             }
+        } else if (lowNibble === 0x6) {
+            // Acknowledgment frame for configuration
+            if (dataIndex + 2 > hexData.length) {
+                return { errors: ["Payload too short to read acknowledgment frame."] };
+            }
+
+            var ackByteHex = hexData.substring(dataIndex, dataIndex + 2);
+            dataIndex += 2;
+            var ackByte = parseInt(ackByteHex, 16);
+
+            decodedData.acknowledgedParameters = [];
+            decodedData.failedParameters = [];
+
+            for (var i = 7; i >= 0; i--) {
+                var parameterStatus = (ackByte & (1 << i)) >> i;
+                if (parameterStatus === 0) {
+                    decodedData.acknowledgedParameters.push(8 - i);
+                } else {
+                    decodedData.failedParameters.push(8 - i);
+                }
+            }
         } else {
             decodedData.frameType = "Unsupported or reserved frame type: 0x" + lowNibble.toString(16).toUpperCase();
         }
