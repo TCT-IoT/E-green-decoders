@@ -1,73 +1,70 @@
-
-
 var hexData = msg.payload;
 var devAddr = msg.rawdata.devaddr;
 
-
-// We want to retrieve the last 8 caracters of the devAddr
+// We want to retrieve the last 8 characters of the devAddr
 devAddr = devAddr.substring(devAddr.length - 8);
 
 var hexToDecimal = hex => parseInt(hex, 16);
 
 hexData = hexData.toUpperCase();
 
-// Types de mesures possibles
-// Ces valeurs viennent de la documentation Lora du capteur.
+// Possible types of measurements
+// These values come from the sensor's LoRa documentation.
 var typeReferences = {
-    '08': 'Temperature:'+devAddr,
-    '0A': 'Tension:'+devAddr,
-    '0B': 'Courant:'+devAddr
+    '08': 'Temperature:' + devAddr,
+    '0A': 'Voltage:' + devAddr,
+    '0B': 'Current:' + devAddr
 };
 
-// Correspondance des valeurs pour obtenir des °C, V et A
-// Les valeurs renvoyées par le capteur sont en centième de degré, millième de Volts et millèmes d'ampères
-// Ces valeurs viennent de la documentation Lora du capteur
+// Corresponding values to get °C, V, and A
+// The values returned by the sensor are in hundredths of a degree, thousandths of Volts, and thousandths of Amps
+// These values come from the sensor's LoRa documentation
 var dividerReferences = {
     '08': 100,
     '0A': 1000,
     '0B': 100
 };
 
-// Paramètres de la trame
-// a0 = Trame de mesure, pas d'historique, 1 échantillon
+// Frame parameters
+// a0 = Measurement frame, no history, 1 sample
 
 var currentDate = new Date();
 var loraPacketType = hexData[0] + hexData[1];
-var nbSamples = hexToDecimal(hexData[1])+1;
-// Si on a plus d'un échantillon, on récupère la fréquence d'émission
+var nbSamples = hexToDecimal(hexData[1]) + 1;
+// If we have more than one sample, we retrieve the transmission frequency
 
 var emissionFrequency = 0;
-if(nbSamples > 1) {
+if (nbSamples > 1) {
     emissionFrequency = hexToDecimal(hexData[2] + hexData[3] + hexData[4] + hexData[5]) / nbSamples;
 }
 
-// Données formattées
+// Formatted data
 var decryptedDatas = {};
 
 var dataIndex = 2 + (nbSamples > 1 ? 4 : 0);
 var readingDataType = 0;
-// Chaque donnée est codée sur x bits, 2 bits pour le type de la donnée et 4*nbSamples pour la valeur
+// Each data point is coded on x bits, 2 bits for the data type and 4*nbSamples for the value
 while (dataIndex < hexData.length) {
-    // On récupère le type de donnée
-    var dataTypeValue = hexData[dataIndex] + hexData[dataIndex+1];
-    // Puis la correspondance human readable
+    // Retrieve the data type
+    var dataTypeValue = hexData[dataIndex] + hexData[dataIndex + 1];
+    // Then get the human-readable correspondence
     var dataType = typeReferences[dataTypeValue];
     dataIndex += 2;
     decryptedDatas[readingDataType] = [];
 
-    var stopReadingValues = dataIndex + 4*nbSamples;
+    var stopReadingValues = dataIndex + 4 * nbSamples;
 
-    while(dataIndex < stopReadingValues) {
-        var currentValues= {};
+    while (dataIndex < stopReadingValues) {
+        var currentValues = {};
 
-        // Ensuite on récupère la valeur de la mesure
+        // Next, retrieve the measurement value
         var data = "";
         var stopReadingDigit = dataIndex + 4;
         while (dataIndex < stopReadingDigit) {
             data += hexData[dataIndex];
             dataIndex += 1;
         }
-        // Enfin on convertit la mesure en décimal et on la divise pour travailler avec les unités qui nous intéressent
+        // Finally, convert the measurement to decimal and divide it to work with the desired units
         var decimalData = parseInt(data, 16);
         currentValues[dataType] = decimalData / dividerReferences[dataTypeValue];
 
@@ -85,7 +82,7 @@ for (var k = 0; k < keys.length; k++) {
     var data = decryptedDatas[key];
     for (var i = 0; i < data.length; i++) {
         var dataType = Object.keys(data[i])[0];
-        if(combinedData[i] === undefined) {
+        if (combinedData[i] === undefined) {
             combinedData[i] = {};
         }
         combinedData[i][dataType] = data[i][dataType];
@@ -93,9 +90,9 @@ for (var k = 0; k < keys.length; k++) {
 }
 
 var messages = [];
-for (var i= 0; i < nbSamples; i++) {
+for (var i = 0; i < nbSamples; i++) {
     var sampleDate = new Date();
-    sampleDate.setMinutes(currentDate.getMinutes() - emissionFrequency * (nbSamples - i-1));
+    sampleDate.setMinutes(currentDate.getMinutes() - emissionFrequency * (nbSamples - i - 1));
 
     var sample = {};
     sample.payload = {
